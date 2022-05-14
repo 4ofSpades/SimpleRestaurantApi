@@ -1,0 +1,8 @@
+@startuml
+title Entity-Relationship model SimpleRestaurantApi
+Restaurant "1" ||--|{ "1..*" Table
+Restaurant "1" ||--|{ "1..*" Waiter
+Table "1" ||--|{ "1..*" Order
+Order "1" ||--|{ "1..*" OrderItem
+OrderItem "1" ||--|| "1..*" Item
+@enduml
