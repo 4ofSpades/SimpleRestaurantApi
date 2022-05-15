@@ -1,11 +1,11 @@
 CREATE TABLE "restaurants" (
   "id" SERIAL PRIMARY KEY,
-  "name" varchar
+  "name" varchar(255)
 );
 
 CREATE TABLE "waiters" (
   "id" SERIAL PRIMARY KEY,
-  "name" varchar,
+  "name" varchar(255),
   "restaurant_id" int
 );
 
@@ -17,7 +17,7 @@ CREATE TABLE "tables" (
 CREATE TABLE "orders" (
   "id" SERIAL PRIMARY KEY,
   "table_id" int,
-  "created_at" datetime DEFAULT (now())
+  "created_at" TIMESTAMP
 );
 
 CREATE TABLE "order_items" (
@@ -29,7 +29,7 @@ CREATE TABLE "order_items" (
 
 CREATE TABLE "items" (
   "id" int PRIMARY KEY,
-  "name" varchar,
+  "name" varchar(255),
   "duration" int
 );
 
