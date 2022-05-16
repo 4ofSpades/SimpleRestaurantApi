@@ -1166,7 +1166,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "simple_restaurant_api"
+name = "simple_restaurant_api_server"
 version = "0.1.0"
 dependencies = [
  "gluesql",
