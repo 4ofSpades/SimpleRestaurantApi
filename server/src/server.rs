@@ -8,11 +8,12 @@ pub mod server {
     }
 
     pub struct TcpServer<T: Storage>{
-        storage: T,
+        pub storage: T,
     }
 
     impl<T: storage::storage::Storage> Server for TcpServer<T> {
         fn run(&self) {
+            //TODO: Use tokio
             let port = "7878";
             let listener = TcpListener::bind(format!("127.0.0.1:{}", port)).unwrap();
             for stream in listener.incoming() {

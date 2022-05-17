@@ -1,72 +1,94 @@
 pub mod storage {
-    use std::{time::{SystemTime, UNIX_EPOCH}, thread};
     use rand::Rng;
     use crate::data_models::data_models::Order;
     use { 
         gluesql::{ prelude::{Glue, Payload, Value}, sled_storage::SledStorage },
-        std::fs,
+        std::{time::{SystemTime, UNIX_EPOCH}, sync::RwLock, thread, sync::Arc},
+        async_trait::async_trait
     };
 
     
+    #[async_trait]
     pub trait Storage {
-        fn add_order(&self, table_id: u16, items: &str);
-        fn delete_order(&self, order_id: u16);
-        fn get_remaining_table_orders(&self, table_id: u16);
+        async fn add_order(&self, table_id: u16, item: &str);
+        async fn delete_order(&self, table_id: u16, item: &str);
+        async fn get_remaining_table_orders(&self, table_id: u16);
+        async fn get_items_for_table(&self, table_id: u16, items: &str);
     }
 
     pub struct Database {
-        storage: SledStorage,
+        pub storage: SledStorage,
+        order_increment: Arc<RwLock<u16>>,
     }
 
+    #[async_trait]
     impl Storage for Database {
-        fn add_order(&self, table_id: u16, items: & str) {
-            let mut rng = rand::thread_rng();
-            let now = SystemTime::now().duration_since(UNIX_EPOCH).expect("Invalid time").as_millis();
-            let sql = format!("INSERT INTO orders VALUES ({}, {}, {}, {})", table_id, now, items, rng.gen_range(5..15));
-            let clone = self.storage.clone();
+        async fn add_order(&self, table_id: u16, item: &str) {
+            if let Ok(read_guard) = self.order_increment.read() {
+                let mut rng = rand::thread_rng();
+                let now = SystemTime::now().duration_since(UNIX_EPOCH).expect("Invalid time").as_millis();
+                let sql = format!("INSERT INTO orders VALUES ({}, {}, {}, {}, {})", *read_guard, table_id, now, item, rng.gen_range(5..15));
+                let clone = self.storage.clone();
 
-            thread::spawn(move || {
                 let mut glue = Glue::new(clone);
                 glue.execute(sql).unwrap();
-            }).join().expect("Failed to add order.");
+            } 
+            if let Ok(mut write_guard) = self.order_increment.write() {
+                *write_guard += 1;
+            }
         }
 
-        fn delete_order(&self, order_id: u16) {
-            let sql = "TODO";
-            let clone = self.storage.clone();
-
-            thread::spawn(move || {
+        async fn delete_order(&self, table_id: u16, item: &str) {
+            if let Ok(_write_guard) = self.order_increment.write() {
+                let sql = "TODO";
+                let clone = self.storage.clone();
                 let mut glue = Glue::new(clone);
                 glue.execute(sql).unwrap();
-            }).join().expect("Failed to delete order.");
-            
+            }
         }
 
-        fn get_remaining_table_orders(&self, table_id: u16) {
+        async fn get_remaining_table_orders(&self, table_id: u16) {
+            //TODO: Use read_lock
+            //TODO: Check if async is still useful
             let now = SystemTime::now().duration_since(UNIX_EPOCH).expect("Invalid time").as_millis();
             let sql = format!("SELECT * 
             FROM Orders 
             WHERE table_id = {} 
             AND created_at + duration < {}", table_id, now);
             let clone = self.storage.clone();
+            let mut glue = Glue::new(clone);
+            glue.execute(sql).unwrap();
+        }
 
-            thread::spawn(move || {
-                let mut glue = Glue::new(clone);
-                glue.execute(sql).unwrap();
-            }).join().expect("Failed to get remaining tables.");
+        async fn get_items_for_table(&self, table_id: u16, item: &str) {
+            let sql = format!("SELECT *
+            FROM Orders
+            WHERE table_id = {}
+            AND item LIKE '%{}%'", table_id, item);
+            let clone = self.storage.clone();
+
+            let mut glue = Glue::new(clone);
+            glue.execute(sql).unwrap();
         }
     }
 
     impl Database {
-        fn new(path: &str) -> Database {
+        pub fn new(path: &str) -> Database {
             Database {
                 storage: SledStorage::new(path).expect("Failed to create DB instance."),
+                order_increment: Arc::new(RwLock::new(0)),
             }
         }
 
-        fn init(&self) {
+        pub fn init(&self) {
             let mut glue = Glue::new(self.storage.clone());
-            let sql = fs::read_to_string("SimpleRestaurantApiDBDemo.sql").expect("Error reading the SQL file.");
+            let sql = "CREATE TABLE orders (
+                id int,
+                table_id int,
+                created_at int,
+                items varchar(255),
+                duration int
+              )";
             glue.execute(sql).unwrap();
         }
     }

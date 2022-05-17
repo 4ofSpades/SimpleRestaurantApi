@@ -4,6 +4,6 @@ CREATE TABLE "orders" (
   "created_at" int,
   "items" varchar(255),
   "duration" int,
-);
+)
 
 
