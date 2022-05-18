@@ -1,35 +1,40 @@
 pub mod server {
-    use std::{net::TcpListener, thread};
-
+    use tokio::{net::TcpListener, io::{AsyncReadExt, AsyncWriteExt}};
     use crate::storage::{storage::Storage, self};
-
-    pub trait Server {
-        fn run(&self);
-    }
 
     pub struct TcpServer<T: Storage>{
         pub storage: T,
     }
 
-    impl<T: storage::storage::Storage> Server for TcpServer<T> {
-        fn run(&self) {
-            //TODO: Use tokio
-            let port = "7878";
-            let listener = TcpListener::bind(format!("127.0.0.1:{}", port)).unwrap();
-            for stream in listener.incoming() {
-                match stream {
-                    Ok(stream) => {
-                        println!("New connection: {}", stream.peer_addr().unwrap());
-                        thread::spawn(move|| {
-                            //DO something with client
-                        });
+    impl<T: storage::storage::Storage> TcpServer<T> {
+        pub async fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
+            let addr = "127.0.0.1:7878";
+            let listener = TcpListener::bind(addr).await?;
+            println!("Listening on {}", addr);
+            loop {
+                let (mut socket, _) = listener.accept().await?; 
+
+                tokio::spawn(async move {
+                    println!("Connection recieved!");
+                    let mut buffer = vec![0; 1024];
+
+                    loop {
+                        let n = socket
+                            .read(&mut buffer)
+                            .await
+                            .expect("failed to read data from socket");
+        
+                        if n == 0 {
+                            return;
+                        }
+        
+                        socket
+                            .write_all(&buffer[0..n])
+                            .await
+                            .expect("failed to write data to socket");
                     }
-                    Err(e) => {
-                        println!("Error: {}", e);
-                    }
-                }
+                });
             }
-            drop(listener);
         }
     }
 }
