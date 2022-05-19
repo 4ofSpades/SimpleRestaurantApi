@@ -1,40 +1,54 @@
 pub mod server {
-    use tokio::{net::TcpListener, io::{AsyncReadExt, AsyncWriteExt}};
-    use crate::storage::{storage::Storage, self};
+    use std::net::SocketAddr;
 
-    pub struct TcpServer<T: Storage>{
-        pub storage: T,
-    }
+    use crate::storage::{storage::{handle_request_for_database}};
+    use bb8::Pool;
+    use bb8_postgres::PostgresConnectionManager;
+    use hyper::{service::{make_service_fn, service_fn}, Server, Error, Response, Body};
+    
 
-    impl<T: storage::storage::Storage> TcpServer<T> {
-        pub async fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
-            let addr = "127.0.0.1:7878";
-            let listener = TcpListener::bind(addr).await?;
-            println!("Listening on {}", addr);
-            loop {
-                let (mut socket, _) = listener.accept().await?; 
+    pub struct HttpServer ();
 
-                tokio::spawn(async move {
-                    println!("Connection recieved!");
-                    let mut buffer = vec![0; 1024];
+    impl HttpServer {
+        pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+            let addr = SocketAddr::from(([127, 0, 0, 1], 7878));
 
-                    loop {
-                        let n = socket
-                            .read(&mut buffer)
-                            .await
-                            .expect("failed to read data from socket");
+            //TODO: Configure path using docker
+            let pg_mgr = PostgresConnectionManager::new_from_stringlike(
+                "postgresql://postgres:mysecretpassword@localhost:5432",
+                tokio_postgres::NoTls,
+            )
+            .unwrap();
         
-                        if n == 0 {
-                            return;
-                        }
-        
-                        socket
-                            .write_all(&buffer[0..n])
-                            .await
-                            .expect("failed to write data to socket");
+            let pool = match Pool::builder().build(pg_mgr).await {
+                Ok(pool) => pool,
+                Err(e) => panic!("bb8 error {}", e),
+            };
+            
+            let _ = Server::bind(&addr)
+            .serve(make_service_fn(move |_| {
+                let pool = pool.clone();
+                async move {
+                    Ok::<_, Error>(service_fn(move |request| {
+                        let pool = pool.clone();
+                        async move {
+                            println!("Got request");
+                            Ok::<_, Error>(match handle_request_for_database(pool, request).await {
+                                Ok(rsp) => {
+                                    println!("Sending success response");
+                                    rsp
+                                }
+                                Err(e) => {
+                                    println!("Sending error response");
+                                    Response::new(Body::from(format!("Internal error {:?}", e)))
+                                }
+                        })
                     }
-                });
+                }))
             }
+        }))
+        .await;
+            Ok(())
         }
     }
 }
