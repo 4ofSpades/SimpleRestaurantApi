@@ -1,95 +1,102 @@
 pub mod storage {
+    use bb8::Pool;
+    use bb8_postgres::PostgresConnectionManager;
+    use hyper::{Request, Body, Response, Method, StatusCode};
     use rand::Rng;
-    use crate::data_models::data_models::Order;
+    use tokio_postgres::NoTls;
     use { 
-        gluesql::{ prelude::{Glue, Payload, Value}, sled_storage::SledStorage },
         std::{time::{SystemTime, UNIX_EPOCH}, sync::RwLock, thread, sync::Arc},
         async_trait::async_trait
     };
 
-    
+    /// Common interface providing headers for required functions. 
     #[async_trait]
-    pub trait Storage {
-        async fn add_order(&self, table_id: u16, item: &str);
-        async fn delete_order(&self, table_id: u16, item: &str);
-        async fn get_remaining_table_orders(&self, table_id: u16);
-        async fn get_items_for_table(&self, table_id: u16, items: &str);
+    trait Storage {
+        async fn add_order(table_id: u16, item: &str);
+        async fn delete_order(table_id: u16, item: &str);
+        async fn get_remaining_table_orders(table_id: u16) -> String;
+        async fn get_items_for_table(table_id: u16, items: &str) -> String;
     }
 
-    pub struct Database {
-        pub storage: SledStorage,
-        order_increment: Arc<RwLock<u16>>,
-    }
+    /// Type of storage that makes use of a relational database.
+    struct Database ();
 
+    /// Provides the Database struct with an implementation of the Storage trait.
     #[async_trait]
     impl Storage for Database {
-        async fn add_order(&self, table_id: u16, item: &str) {
-            if let Ok(read_guard) = self.order_increment.read() {
-                let mut rng = rand::thread_rng();
-                let now = SystemTime::now().duration_since(UNIX_EPOCH).expect("Invalid time").as_millis();
-                let sql = format!("INSERT INTO orders VALUES ({}, {}, {}, {}, {})", *read_guard, table_id, now, item, rng.gen_range(5..15));
-                let clone = self.storage.clone();
-
-                let mut glue = Glue::new(clone);
-                glue.execute(sql).unwrap();
-            } 
-            if let Ok(mut write_guard) = self.order_increment.write() {
-                *write_guard += 1;
-            }
+        async fn add_order(table_id: u16, item: &str) {
+            let mut rng = rand::thread_rng();
+            let now = SystemTime::now().duration_since(UNIX_EPOCH).expect("Invalid time").as_millis();
+            let sql = format!("INSERT INTO orders VALUES ({}, {}, {}, {})", table_id, now, item, rng.gen_range(5..15));
         }
 
-        async fn delete_order(&self, table_id: u16, item: &str) {
-            if let Ok(_write_guard) = self.order_increment.write() {
-                let sql = "TODO";
-                let clone = self.storage.clone();
-                let mut glue = Glue::new(clone);
-                glue.execute(sql).unwrap();
-            }
+        async fn delete_order(table_id: u16, item: &str) {
+            let sql = "TODO";
         }
 
-        async fn get_remaining_table_orders(&self, table_id: u16) {
-            //TODO: Use read_lock
-            //TODO: Check if async is still useful
+        async fn get_remaining_table_orders(table_id: u16) -> String {
             let now = SystemTime::now().duration_since(UNIX_EPOCH).expect("Invalid time").as_millis();
             let sql = format!("SELECT * 
             FROM Orders 
             WHERE table_id = {} 
             AND created_at + duration < {}", table_id, now);
-            let clone = self.storage.clone();
-            let mut glue = Glue::new(clone);
-            glue.execute(sql).unwrap();
+            sql
         }
 
-        async fn get_items_for_table(&self, table_id: u16, item: &str) {
+        async fn get_items_for_table(table_id: u16, item: &str) -> String {
             let sql = format!("SELECT *
             FROM Orders
             WHERE table_id = {}
             AND item LIKE '%{}%'", table_id, item);
-            let clone = self.storage.clone();
-
-            let mut glue = Glue::new(clone);
-            glue.execute(sql).unwrap();
+            sql
         }
     }
+    
+    /// Handles HTTP request for the database implementation of the Storage trait.
+    pub async fn handle_request_for_database(req: Request<Body>, pool: Pool<PostgresConnectionManager<NoTls>>) -> Result<Response<Body>, hyper::Error> {
+        let mut response = Response::new(Body::empty());
+        match(req.method(), req.uri().path()) {
+            (&Method::GET, "/") => {
+                println!("Connection established");
+                *response.status_mut() = StatusCode::OK; 
+            },
 
-    impl Database {
-        pub fn new(path: &str) -> Database {
-            Database {
-                storage: SledStorage::new(path).expect("Failed to create DB instance."),
-                order_increment: Arc::new(RwLock::new(0)),
+            (&Method::GET, "/tables/get-items-for-table") => {
+                //TODO: Validate request query 
+                println!("Request received: Get items for table {}", 16);
+                let result = Database::get_items_for_table(16, "Spaghetti").await;
+                *response.body_mut() = Body::from(result);
+            },
+
+            (&Method::GET, "/tables/get-remaining-orders") => {
+                let body = hyper::body::to_bytes(req.into_body()).await?;
+                println!("Request received: Get remaining items for table {}", 16);
+                let result = Database::get_remaining_table_orders(16).await;
+                *response.body_mut() = Body::from(result);
+            },
+
+            (&Method::POST, "/orders") => {
+                let body = hyper::body::to_bytes(req.into_body()).await?;
+                println!("Request received: Add order {} for table {}","Spaghetti" ,16);
+                let result = Database::add_order(16, "Spaghetti").await;
+                //TODO: Return order id?
+                *response.status_mut() = StatusCode::OK;
+            },
+
+            (&Method::DELETE, "/orders") => {
+                let body = hyper::body::to_bytes(req.into_body()).await?;
+                println!("Request received: Del order {} for table {}", "Spaghetti", 16);
+                //TODO: Use order id?
+                let result = Database::delete_order(16, "Spaghetti").await;
+                *response.status_mut() = StatusCode::OK;
+            },
+
+
+            _ => {
+                *response.status_mut() = StatusCode::NOT_FOUND;
             }
         }
 
-        pub fn init(&self) {
-            let mut glue = Glue::new(self.storage.clone());
-            let sql = "CREATE TABLE orders (
-                id int,
-                table_id int,
-                created_at int,
-                items varchar(255),
-                duration int
-              )";
-            glue.execute(sql).unwrap();
-        }
+        Ok(response)
     }
 }

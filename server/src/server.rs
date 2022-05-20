@@ -5,10 +5,11 @@ pub mod server {
     use bb8::Pool;
     use bb8_postgres::PostgresConnectionManager;
     use hyper::{service::{make_service_fn, service_fn}, Server, Error, Response, Body};
-    
 
+    /// Defines a type for a HTTP server.
     pub struct HttpServer ();
 
+    /// Provides an implementation for running an HTTP server.
     impl HttpServer {
         pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             let addr = SocketAddr::from(([127, 0, 0, 1], 7878));
@@ -33,7 +34,7 @@ pub mod server {
                         let pool = pool.clone();
                         async move {
                             println!("Got request");
-                            Ok::<_, Error>(match handle_request_for_database(pool, request).await {
+                            Ok::<_, Error>(match handle_request_for_database(request, pool).await {
                                 Ok(rsp) => {
                                     println!("Sending success response");
                                     rsp

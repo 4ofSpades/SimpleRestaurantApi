@@ -5,6 +5,6 @@ mod server;
 mod storage;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    HttpServer::run()
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    HttpServer::run().await
 }
