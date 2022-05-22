@@ -1,5 +1,5 @@
 pub mod client {
-    use hyper::{Client, Request, Method, Body};
+    use hyper::{Client, Request, Method, Body, Uri, http::Error};
     
 
     pub struct HttpClient {
@@ -7,16 +7,25 @@ pub mod client {
     }
 
     impl HttpClient {
-        pub async fn add_order(&self, table_id: u16, item: &str) {
-            let uri = self.base_addr.to_string() + "/orders";
+
+        pub async fn test_connection(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+            let client = Client::new();
+            client.get(Uri::from_static("http://127.0.0.1:7878")).await?;
+
+            Ok(())
+        }
+
+        pub async fn add_order(&self, table_id: u16, item: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+            //let uri = Uri::builder().authority(self.base_addr.to_string() + "/orders").build().unwrap();
             let client = Client::new();
             let req = Request::builder()
                 .method(Method::POST)
-                .uri(uri)
+                .uri(self.base_addr.to_string() + "/orders")
                 .header("", "")
                 .body(Body::from("")).unwrap();
 
-            client.request(req).await;
+            client.request(req).await?;
+            Ok(())
         }
 
         // async fn delete_order(&self, table_id: u16, item: &str) {

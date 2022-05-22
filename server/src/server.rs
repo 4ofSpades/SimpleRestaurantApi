@@ -16,17 +16,18 @@ pub mod server {
 
             //TODO: Configure path using docker
             let pg_mgr = PostgresConnectionManager::new_from_stringlike(
-                "postgresql://postgres:mysecretpassword@localhost:8080",
+                "postgres://postgres:postgrespw@localhost:55000",
                 tokio_postgres::NoTls,
             )
             .unwrap();
-
-            println!("Database connection established");
         
-            let pool = match Pool::builder().build(pg_mgr).await {
+            let pool = match Pool::builder().
+            max_size(15).build(pg_mgr).await {
                 Ok(pool) => pool,
                 Err(e) => panic!("bb8 error {}", e),
             };
+
+            println!("Pool built");
 
             init(pool.clone()).await?;
 

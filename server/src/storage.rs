@@ -112,7 +112,7 @@ pub mod storage {
     pub async fn init(pool: Pool<PostgresConnectionManager<NoTls>>) -> Result<Response<Body>, RunError<tokio_postgres::Error>> {
         let conn = pool.get().await?;
         let query = "BEGIN;
-        DROP TABLE orders;
+        DROP TABLE IF EXISTS orders;
 
         CREATE TABLE orders (
           id SERIAL PRIMARY KEY,
@@ -122,7 +122,9 @@ pub mod storage {
           duration int NOT NULL
         );
         COMMIT;";
-        conn.query(query, &[]).await?;
+
+        println!("Running init for DB");
+        conn.batch_execute(query).await?;
         Ok(Response::new(Body::empty()))
     }
 }
