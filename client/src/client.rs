@@ -8,6 +8,7 @@ pub mod client {
 
     impl HttpClient {
 
+        /// Sends a GET request to the API as a means of checking if a connection can be made.
         pub async fn test_connection(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             let client = Client::new();
             client.get(Uri::from_static("http://127.0.0.1:7878")).await?;
@@ -15,6 +16,7 @@ pub mod client {
             Ok(())
         }
 
+        /// Send a POST request to the API for adding a new order.
         pub async fn add_order(&self, table_id: u16, item: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             //let uri = Uri::builder().authority(self.base_addr.to_string() + "/orders").build().unwrap();
             let client = Client::new();
