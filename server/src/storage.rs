@@ -1,13 +1,13 @@
 pub mod storage {
     use bb8::{Pool, RunError};
     use bb8_postgres::PostgresConnectionManager;
-    use hyper::{Request, Body, Response, Method, StatusCode};
+    use hyper::{Request, Body, Response, Method, StatusCode, Uri};
     use rand::{rngs::StdRng, SeedableRng, Rng};
     use tokio_postgres::NoTls;
-    use { 
-        std::time::{SystemTime, UNIX_EPOCH},
-        async_trait::async_trait
-    };
+    use std::{time::{SystemTime, UNIX_EPOCH}, collections::HashMap};
+    use async_trait::async_trait;
+
+    use crate::data_models::data_models::Order;
 
     /// Common interface providing headers for required functions. 
     #[async_trait]
@@ -15,7 +15,7 @@ pub mod storage {
         async fn add_order(pool: Pool<PostgresConnectionManager<NoTls>>, table_id: u16, item: String) -> Result<Response<Body>, RunError<tokio_postgres::Error>>;
         // async fn delete_order(pool: Pool<PostgresConnectionManager<NoTls>>, table_id: u16, item: &str) -> Result<Response<Body>, RunError<tokio_postgres::Error>>;
         // async fn get_remaining_table_orders(pool: Pool<PostgresConnectionManager<NoTls>>, table_id: u16) -> Result<Response<Body>, RunError<tokio_postgres::Error>>;
-        // async fn get_items_for_table(pool: Pool<PostgresConnectionManager<NoTls>>, table_id: u16, items: &str) -> Result<Response<Body>, RunError<tokio_postgres::Error>>;
+        async fn get_items_for_table(pool: Pool<PostgresConnectionManager<NoTls>>, table_id: u16, items: &str) -> Result<Response<Body>, RunError<tokio_postgres::Error>>;
     }
 
     /// Type of storage that makes use of a relational database.
@@ -57,14 +57,34 @@ pub mod storage {
         //     sql
         // }
 
-        // async fn get_items_for_table(pool: Pool<PostgresConnectionManager<NoTls>>, table_id: u16, item: &str)
-        // -> Result<Response<Body>, RunError<tokio_postgres::Error>> {
-        //     let sql = format!("SELECT *
-        //     FROM Orders
-        //     WHERE table_id = {}
-        //     AND item LIKE '%{}%'", table_id, item);
-        //     sql
-        // }
+        async fn get_items_for_table(pool: Pool<PostgresConnectionManager<NoTls>>, table_id: u16, item: &str)
+        -> Result<Response<Body>, RunError<tokio_postgres::Error>> {
+            let conn = pool.get().await?;
+            let stmt = conn.prepare(
+                "SELECT *
+                FROM orders
+                WHERE table_id = $1
+                AND item LIKE $2").await?;
+            let table_id: i32 = i32::from(table_id); 
+            let item = format!("%{}%", item);
+            let response = conn.query(&stmt, &[&table_id, &item]).await?;
+            let mut result: Vec<String> = Vec::new();
+
+            //TODO: See if O(n^2) can be optimized
+            for row in response {
+                result.push(row.get(0));
+                let mut row_string = String::new();
+                //TODO: Transform in ID instead of string, and use to_string to push to Vec
+                let order = Order::new(
+                    row.get(Order::get_id_name()),
+                    row.get(Order::get_table_id_name()),
+                    row.get(Order::get_created_at_name()),
+                    row.get(Order::get_item_name()),
+                    row.get(Order::get_duration_name));
+            }
+
+            Ok(Response::new(Body::from(result.join("\n"))))
+        }
     }
     
     /// Handles HTTP request for the postgres database implementation.
@@ -77,11 +97,11 @@ pub mod storage {
                 *response.status_mut() = StatusCode::OK; 
             },
 
-            // (&Method::GET, "/tables/get-items-for-table") => {
-            //     println!("Request received: Get items for table {}", 16);
-            //     //TODO
-            //     *response.body_mut() = PostgresDatabase::get_items_for_table(pool.clone(), 16, "Spaghetti").await?.into_body();
-            // },
+            (&Method::GET, "/tables/orders") => {
+                let params = convert_uri_query_to_hashmap(req.uri().query().unwrap());
+                println!("Request received: Get orders containing {} for table {}", params["item"], params["table_id"]);
+                *response.body_mut() = PostgresDatabase::get_items_for_table(pool.clone(), params["table_id"].parse::<u16>().unwrap(), params["item"]).await?.into_body();
+            },
 
             // (&Method::GET, "/tables/get-remaining-orders") => {
             //     println!("Request received: Get remaining items for table {}", 16);
@@ -114,17 +134,24 @@ pub mod storage {
         let query = "BEGIN;
         DROP TABLE IF EXISTS orders;
 
-        CREATE TABLE orders (
+        CREATE TABLE IF NOT EXISTS orders (
           id SERIAL PRIMARY KEY,
           table_id INTEGER NOT NULL,
           created_at INTEGER NOT NULL,
           item VARCHAR(255) NOT NULL,
           duration int NOT NULL
         );
+
+        INSERT INTO orders (table_id, created_at, item, duration) 
+            VALUES (999, 500, 'Spaghetti', 100);
         COMMIT;";
 
         println!("Running init for DB");
         conn.batch_execute(query).await?;
         Ok(Response::new(Body::empty()))
+    }
+
+    fn convert_uri_query_to_hashmap(query: &str) -> HashMap<&str, &str> {
+        query.split('&').map(|s| s.split_at(s.find("=").unwrap())).map(|(key, val)| (key, &val[1..])).collect()
     }
 }

@@ -1,9 +1,10 @@
 pub mod client {
-    use hyper::{Client, Request, Method, Body, Uri, http::Error};
+    use hyper::{Client, Request, Method, Body, Uri, body, http::uri::Authority};
     
 
     pub struct HttpClient {
-        base_addr: String,
+        scheme: String,
+        authority: String,
     }
 
     impl HttpClient {
@@ -22,7 +23,7 @@ pub mod client {
             let client = Client::new();
             let req = Request::builder()
                 .method(Method::POST)
-                .uri(self.base_addr.to_string() + "/orders")
+                .uri(self.authority.to_string() + "/orders")
                 .header("", "")
                 .body(Body::from("")).unwrap();
 
@@ -54,22 +55,22 @@ pub mod client {
         //     client.request(req).await?.body()
         // }
 
-        // async fn get_items_for_table(&self, table_id: u16, items: &str) -> String {
-        //     let uri = self.base_addr.to_string() + "/orders";
-        //     let client = Client::new();
-        //     let req = Request::builder()
-        //         .method(Method::POST)
-        //         .uri(uri)
-        //         .header("", "")
-        //         .body(Body::from("")).unwrap();
+        pub async fn get_items_for_table(&self, table_id: u16, item: &str) 
+        -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+            let uri = Uri::builder()
+                .scheme(self.scheme.as_str())
+                .authority(self.authority.as_str())
+                .path_and_query(format!("/tables/orders?table_id={}&item={}", table_id, item))
+                .build().unwrap();
+            let client = Client::new();
+            let mut response = client.get(uri).await?;
+            Ok(String::from_utf8(body::to_bytes(response.body_mut()).await?.to_vec()).unwrap())
+        }
 
-        //     client.request(req).await?.body();
-        //     "AAA".to_string()
-        // }
-
-        pub fn new(base_addr: &str) -> HttpClient {
+        pub fn new(scheme: &str, authority: &str) -> HttpClient {
             HttpClient {
-                base_addr: base_addr.to_string(),
+                scheme: scheme.to_string(),
+                authority: authority.to_string(),
             }
         } 
     }
