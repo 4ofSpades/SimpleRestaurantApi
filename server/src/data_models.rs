@@ -2,57 +2,47 @@ pub mod data_models {
 
     #[derive(Debug)]
     pub struct Order {
-        id: u16,
-        table_id: u16,
-        created_at: u128,
-        item: String,
-        duration: u16,
+        pub id: u16,
+        pub table_id: u16,
+        pub created_at: u128,
+        pub item: String,
+        pub duration: u16,
     }
 
     impl Order {
-        pub fn new(id: u16, table_id: u16, created_at: u128, item: String, duration: u16) -> Order {
-            Order {
-                id,
-                table_id,
-                created_at,
-                item,
-                duration,
-            }
-        }
-
         pub fn to_string(&self) -> String {
-            let id_name = Order::get_id_name();
-            let table_id_name = Order::get_table_id_name();
-            let created_at_name = Order::get_created_at_name();
-            let item_name = Order::get_item_name();
-            let duration_name = Order::get_duration_name();
+            let id_column_index = Order::get_id_column_index();
+            let table_id_column_index = Order::get_table_id_column_index();
+            let created_at_column_index = Order::get_created_at_column_index();
+            let item_column_index = Order::get_item_column_index();
+            let duration_column_index = Order::get_duration_column_index();
 
             format!("{}:{} {}:{} {}:{} {}:{} {}:{}", 
-            id_name, self.id, 
-            table_id_name, self.table_id,
-            created_at_name, self.created_at,
-            item_name, self.item,
-            duration_name, self.duration)
+            id_column_index, self.id, 
+            table_id_column_index, self.table_id,
+            created_at_column_index, self.created_at,
+            item_column_index, self.item,
+            duration_column_index, self.duration)
         }
 
-        pub fn get_id_name() -> String {
-            "id".to_string()
+        pub fn get_id_column_index() -> u8 {
+            0
         }
 
-        pub fn get_table_id_name() -> String {
-            "table_id".to_string()
+        pub fn get_table_id_column_index() -> usize {
+            1
         }
 
-        pub fn get_created_at_name() -> String {
-            "created_at".to_string()
+        pub fn get_created_at_column_index() -> u8 {
+            2
         }
 
-        pub fn get_item_name() -> String {
-            "item".to_string()
+        pub fn get_item_column_index() -> u8 {
+            3
         }
 
-        pub fn get_duration_name() -> String {
-            "duration".to_string()
+        pub fn get_duration_column_index() -> u8 {
+            4
         }
     }
 }

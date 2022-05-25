@@ -3,7 +3,7 @@ pub mod storage {
     use bb8_postgres::PostgresConnectionManager;
     use hyper::{Request, Body, Response, Method, StatusCode, Uri};
     use rand::{rngs::StdRng, SeedableRng, Rng};
-    use tokio_postgres::NoTls;
+    use tokio_postgres::{NoTls, Row};
     use std::{time::{SystemTime, UNIX_EPOCH}, collections::HashMap};
     use async_trait::async_trait;
 
@@ -68,22 +68,33 @@ pub mod storage {
             let table_id: i32 = i32::from(table_id); 
             let item = format!("%{}%", item);
             let response = conn.query(&stmt, &[&table_id, &item]).await?;
-            let mut result: Vec<String> = Vec::new();
+            let mut result: Vec<Order> = Vec::new();
 
-            //TODO: See if O(n^2) can be optimized
             for row in response {
-                result.push(row.get(0));
-                let mut row_string = String::new();
-                //TODO: Transform in ID instead of string, and use to_string to push to Vec
-                let order = Order::new(
-                    row.get(Order::get_id_name()),
-                    row.get(Order::get_table_id_name()),
-                    row.get(Order::get_created_at_name()),
-                    row.get(Order::get_item_name()),
-                    row.get(Order::get_duration_name));
+                result.push(row_to_order(&row));
             }
 
-            Ok(Response::new(Body::from(result.join("\n"))))
+            let mut result_string: String = String::new();
+            for order in result {
+                result_string.push_str(format!("{}\n", order.to_string()).as_str());
+            }
+
+            Ok(Response::new(Body::from(result_string)))
+        }
+    }
+
+    fn row_to_order(row: &Row) -> Order {
+        let id: i32 = row.get(0);
+        let table_id: i32 = row.get(1);
+        let created_at: i64 = row.get(2);
+        let item: String = row.get(3);
+        let duration: i32 = row.get(4);
+        Order {
+            id: id.try_into().unwrap(),
+            table_id: table_id.try_into().unwrap(),
+            created_at: created_at.try_into().unwrap(),
+            item,
+            duration: duration.try_into().unwrap(),
         }
     }
     

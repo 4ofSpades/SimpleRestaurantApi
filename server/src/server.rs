@@ -16,7 +16,7 @@ pub mod server {
 
             //TODO: Configure path using docker
             let pg_mgr = PostgresConnectionManager::new_from_stringlike(
-                "postgres://postgres:postgrespw@localhost:55000",
+                "postgres://postgres:postgrespw@localhost:55004",
                 tokio_postgres::NoTls,
             )
             .unwrap();
