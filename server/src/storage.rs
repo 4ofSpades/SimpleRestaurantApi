@@ -4,18 +4,19 @@ pub mod storage {
     use hyper::{Request, Body, Response, Method, StatusCode};
     use rand::{rngs::StdRng, SeedableRng, Rng};
     use tokio_postgres::{NoTls, Row};
-    use std::{time::{SystemTime, UNIX_EPOCH}, collections::HashMap};
+    use std::{collections::HashMap, ops::Add};
     use async_trait::async_trait;
+    use chrono::{prelude::*, Duration};
 
     use crate::data_models::data_models::Order;
 
     /// Common interface providing headers for required functions. 
     #[async_trait]
     trait PostgresStorage {
-        async fn add_order(pool: Pool<PostgresConnectionManager<NoTls>>, table_id: u32, item: String) -> Result<Response<Body>, RunError<tokio_postgres::Error>>;
-        async fn delete_order(pool: Pool<PostgresConnectionManager<NoTls>>, id: u32) -> Result<Response<Body>, RunError<tokio_postgres::Error>>;
-        async fn get_remaining_table_orders(pool: Pool<PostgresConnectionManager<NoTls>>, table_id: u32) -> Result<Response<Body>, RunError<tokio_postgres::Error>>;
-        async fn get_items_for_table(pool: Pool<PostgresConnectionManager<NoTls>>, table_id: u32, items: &str) -> Result<Response<Body>, RunError<tokio_postgres::Error>>;
+        async fn add_order(pool: Pool<PostgresConnectionManager<NoTls>>, table_id: i32, item: String) -> Result<Response<Body>, RunError<tokio_postgres::Error>>;
+        async fn delete_order(pool: Pool<PostgresConnectionManager<NoTls>>, id: i32) -> Result<Response<Body>, RunError<tokio_postgres::Error>>;
+        async fn get_remaining_table_orders(pool: Pool<PostgresConnectionManager<NoTls>>, table_id: i32) -> Result<Response<Body>, RunError<tokio_postgres::Error>>;
+        async fn get_items_for_table(pool: Pool<PostgresConnectionManager<NoTls>>, table_id: i32, items: &str) -> Result<Response<Body>, RunError<tokio_postgres::Error>>;
     }
 
     /// Type of storage that makes use of a relational database.
@@ -24,23 +25,25 @@ pub mod storage {
     /// Provides the Database struct with an implementation of the Storage trait.
     #[async_trait]
     impl PostgresStorage for PostgresDatabase {
-        async fn add_order(pool: Pool<PostgresConnectionManager<NoTls>>, table_id: u32, item: String) 
+        async fn add_order(pool: Pool<PostgresConnectionManager<NoTls>>, table_id: i32, item: String) 
         -> Result<Response<Body>, RunError<tokio_postgres::Error>> {
             let mut rng = StdRng::from_entropy();
-            let now = SystemTime::now().duration_since(UNIX_EPOCH).expect("Invalid time").as_millis().to_string();
-            let now = now.parse::<i64>().unwrap();
-            let duration_millis: u32 = rng.gen_range(15000..60000);
+            let now = Utc::now();
+
+            let duration_millis: i64 = rng.gen_range(15000..60000);
+            let finished = now.clone();
+            let finished = finished.add(Duration::milliseconds(duration_millis));
             let item = item.to_ascii_lowercase();
             let item = item.trim();
 
             let conn = pool.get().await?;
             let stmt = conn.prepare("INSERT INTO orders (table_id, created_at, item, duration) 
             VALUES ($1, $2, $3)").await?;
-            let response = conn.execute(&stmt, &[&table_id, &now, &item, &duration_millis]).await?;
+            let response = conn.execute(&stmt, &[&table_id, &now, &item, &finished]).await?;
             Ok(Response::new(Body::from(format!("{} order of {} added for table {}", response, item, table_id))))
         }
 
-        async fn delete_order(pool: Pool<PostgresConnectionManager<NoTls>>, id: u32)
+        async fn delete_order(pool: Pool<PostgresConnectionManager<NoTls>>, id: i32)
         -> Result<Response<Body>, RunError<tokio_postgres::Error>> {
             let conn = pool.get().await?;
             let stmt = conn.prepare("DELETE FROM orders
@@ -49,15 +52,14 @@ pub mod storage {
             Ok(Response::new(Body::from(format!("{} order deleted with ID {}", response, id))))
         }
 
-        async fn get_remaining_table_orders(pool: Pool<PostgresConnectionManager<NoTls>>, table_id: u32)
+        async fn get_remaining_table_orders(pool: Pool<PostgresConnectionManager<NoTls>>, table_id: i32)
         -> Result<Response<Body>, RunError<tokio_postgres::Error>> {
-            let now = SystemTime::now().duration_since(UNIX_EPOCH).expect("Invalid time").as_millis().to_string();
-            let now = now.parse::<i64>().unwrap();
+            let now = Utc::now();
             let conn = pool.get().await?;
             let stmt = conn.prepare("SELECT * 
             FROM Orders 
             WHERE table_id = $1 
-            AND created_at + duration < $2").await?;
+            AND finished_at >= $2").await?;
             let response = conn.query(&stmt, &[&table_id, &now]).await?;
 
             let mut result: Vec<Order> = Vec::new();
@@ -72,7 +74,7 @@ pub mod storage {
             Ok(Response::new(Body::from(result_string)))
         }
 
-        async fn get_items_for_table(pool: Pool<PostgresConnectionManager<NoTls>>, table_id: u32, item: &str)
+        async fn get_items_for_table(pool: Pool<PostgresConnectionManager<NoTls>>, table_id: i32, item: &str)
         -> Result<Response<Body>, RunError<tokio_postgres::Error>> {
             let conn = pool.get().await?;
             let stmt = conn.prepare(
@@ -98,18 +100,17 @@ pub mod storage {
     }
 
     fn row_to_order(row: &Row) -> Order {
-        let id: u32 = row.get(Order::get_id_column_index());
-        let table_id: u32 = row.get(Order::get_table_id_column_index());
-        // Will cause a problem in the future
-        let created_at: i64 = row.get(Order::get_created_at_column_index());
+        let id: i32 = row.get(Order::get_id_column_index());
+        let table_id: i32 = row.get(Order::get_table_id_column_index());
+        let created_at: DateTime<Utc> = row.get(Order::get_created_at_column_index());
         let item: String = row.get(Order::get_item_column_index());
-        let duration: u32 = row.get(Order::get_duration_column_index());
+        let finished_at: DateTime<Utc> = row.get(Order::get_duration_column_index());
         Order {
-            id: id.try_into().unwrap(),
-            table_id: table_id.try_into().unwrap(),
-            created_at: created_at.try_into().unwrap(),
+            id,
+            table_id,
+            created_at,
             item,
-            duration: duration.try_into().unwrap(),
+            finished_at,
         }
     }
     
@@ -127,28 +128,29 @@ pub mod storage {
                 let params = convert_uri_query_to_hashmap(req.uri().query().unwrap());
                 println!("Request received: Get orders containing {} for table {}", params["item"], params["table_id"]);
                 *response.body_mut() = PostgresDatabase::get_items_for_table(pool.clone(), 
-                params["table_id"].parse::<u32>().unwrap(), 
+                params["table_id"].parse::<i32>().unwrap(), 
                 params["item"]).await?.into_body();
             },
 
-            (&Method::GET, "/tables/get-remaining-orders") => {
+            (&Method::GET, "/tables/orders/remaining") => {
                 let params = convert_uri_query_to_hashmap(req.uri().query().unwrap());
                 println!("Request received: Get remaining items for table {}", params["table_id"]);
-                *response.body_mut() = PostgresDatabase::get_remaining_table_orders(pool.clone(), params["table_id"].parse::<u32>().unwrap()).await?.into_body();
+                *response.body_mut() = PostgresDatabase::get_remaining_table_orders(pool.clone(),
+                 params["table_id"].parse::<i32>().unwrap()).await?.into_body();
             },
 
             (&Method::POST, "/orders") => {
                 let params = convert_uri_query_to_hashmap(req.uri().query().unwrap());
                 println!("Request received: Add order of {} for table {}", params["item"], params["table_id"]);
                 *response.body_mut() = PostgresDatabase::add_order(pool,
-                    params["table_id"].parse::<u32>().unwrap(),
+                    params["table_id"].parse::<i32>().unwrap(),
                     params["item"].to_string()).await?.into_body();
             },
 
             (&Method::DELETE, "/orders") => {
                 let params = convert_uri_query_to_hashmap(req.uri().query().unwrap());
                 println!("Request received: Delete order with ID {}", params["id"]);
-                *response.body_mut() = PostgresDatabase::delete_order(pool.clone(), params["id"].parse::<u32>().unwrap()).await?.into_body();
+                *response.body_mut() = PostgresDatabase::delete_order(pool.clone(), params["id"].parse::<i32>().unwrap()).await?.into_body();
             },
 
 
@@ -160,6 +162,7 @@ pub mod storage {
         Ok(response)
     }
 
+    /// Initializes the DB by creating (if non-existent) the necessary tables.
     pub async fn init(pool: Pool<PostgresConnectionManager<NoTls>>) -> Result<Response<Body>, RunError<tokio_postgres::Error>> {
         let conn = pool.get().await?;
         let query = "BEGIN;
@@ -168,13 +171,13 @@ pub mod storage {
         CREATE TABLE IF NOT EXISTS orders (
           id SERIAL PRIMARY KEY,
           table_id INTEGER NOT NULL,
-          created_at VARCHAR NOT NULL,
+          created_at TIMESTAMP NOT NULL,
           item VARCHAR(255) NOT NULL,
-          duration int NOT NULL
+          finished_at TIMESTAMP NOT NULL
         );
 
-        INSERT INTO orders (table_id, created_at, item, duration) 
-            VALUES (999, 500, 'Spaghetti', 100);
+        INSERT INTO orders (table_id, created_at, item, finished_at) 
+            VALUES (999, '1999-01-08 04:05:06', 'Spaghetti', '1999-01-08 04:05:10');
         COMMIT;";
 
         println!("Running init for DB");

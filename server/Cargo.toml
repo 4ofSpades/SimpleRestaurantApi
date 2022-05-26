@@ -8,8 +8,10 @@ edition = "2021"
 [dependencies]
 rand = "0.8.5"
 tokio = { version = "1.18.2", features = ["full"] }
-tokio-postgres = "0.7.6"
+tokio-postgres = { version = "0.7.6", features = ["with-chrono-0_4"] }
 bb8 = "0.8.0"
 bb8-postgres = "0.8.0"
 async-trait = "0.1.53"
 hyper = { version = "0.14.18", features = ["full"] }
+time = "0.2.0"
+chrono = "0.4.19"

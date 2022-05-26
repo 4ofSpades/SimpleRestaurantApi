@@ -18,44 +18,61 @@ pub mod client {
         }
 
         /// Send a POST request to the API for adding a new order.
-        pub async fn add_order(&self, table_id: u32, item: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-            //let uri = Uri::builder().authority(self.base_addr.to_string() + "/orders").build().unwrap();
+        pub async fn add_order(&self, table_id: i32, item: &str)
+        -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+            let uri = Uri::builder()
+                .scheme(self.scheme.as_str())
+                .authority(self.authority.as_str())
+                .path_and_query(format!("/orders?table_id={}&item={}", table_id, item))
+                .build().unwrap();
             let client = Client::new();
+
+            // Add parameters to body eventually
             let req = Request::builder()
                 .method(Method::POST)
-                .uri(self.authority.to_string() + "/orders")
-                .header("", "")
-                .body(Body::from("")).unwrap();
+                .uri(uri)
+                .body(Body::empty()).unwrap();
 
-            client.request(req).await?;
-            Ok(())
+            let mut response = client.request(req).await?;
+            Ok(String::from_utf8(body::to_bytes(response.body_mut()).await?.to_vec()).unwrap())
         }
 
-        // async fn delete_order(&self, table_id: u16, item: &str) {
-        //     let uri = self.base_addr.to_string() + "/orders";
-        //     let client = Client::new();
-        //     let req = Request::builder()
-        //         .method(Method::POST)
-        //         .uri(uri)
-        //         .header("", "")
-        //         .body(Body::from("")).unwrap();
+        /// Sends a DELETE request to the API for deleting an order.
+        pub async fn delete_order(&self, id: i32)
+        -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+            let uri = Uri::builder()
+                .scheme(self.scheme.as_str())
+                .authority(self.authority.as_str())
+                .path_and_query(format!("/orders?id={}", id))
+                .build().unwrap();
+            let client = Client::new();
+            
+            // Add parameters to body eventually
+            let req = Request::builder()
+                .method(Method::POST)
+                .uri(uri)
+                .body(Body::empty()).unwrap();
 
-        //     client.request(req).await;
-        // }
+            let mut response = client.request(req).await?;
+            Ok(String::from_utf8(body::to_bytes(response.body_mut()).await?.to_vec()).unwrap())
+        }
 
-        // async fn get_remaining_table_orders(&self, table_id: u16) -> String {
-        //     let uri = self.base_addr.to_string() + "/orders";
-        //     let client = Client::new();
-        //     let req = Request::builder()
-        //         .method(Method::POST)
-        //         .uri(uri)
-        //         .header("", "")
-        //         .body(Body::from("")).unwrap();
+        /// Sends a GET request to the API to retrieve the orders of a given table id that have not finished preparations yet.
+        pub async fn get_remaining_table_orders(&self, table_id: i32) 
+        -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+            let uri = Uri::builder()
+                .scheme(self.scheme.as_str())
+                .authority(self.authority.as_str())
+                .path_and_query(format!("/tables/orders/remaining?table_id={}", table_id))
+                .build().unwrap();
+            let client = Client::new();
 
-        //     client.request(req).await?.body()
-        // }
+            let mut response = client.get(uri).await?;
+            Ok(String::from_utf8(body::to_bytes(response.body_mut()).await?.to_vec()).unwrap())
+        }
 
-        pub async fn get_items_for_table(&self, table_id: u32, item: &str) 
+        /// Sends a GET request getting all orders for a table matching an item.
+        pub async fn get_items_for_table(&self, table_id: i32, item: &str) 
         -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
             let uri = Uri::builder()
                 .scheme(self.scheme.as_str())

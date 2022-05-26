@@ -1,12 +1,14 @@
 pub mod data_models {
+    use chrono::{DateTime, Utc};
+
 
     #[derive(Debug)]
     pub struct Order {
-        pub id: u32,
-        pub table_id: u32,
-        pub created_at: u128,
+        pub id: i32,
+        pub table_id: i32,
+        pub created_at: DateTime<Utc>,
         pub item: String,
-        pub duration: u32,
+        pub finished_at: DateTime<Utc>,
     }
 
     impl Order {
@@ -15,14 +17,14 @@ pub mod data_models {
             let table_id_column_index = Order::get_table_id_column_index();
             let created_at_column_index = Order::get_created_at_column_index();
             let item_column_index = Order::get_item_column_index();
-            let duration_column_index = Order::get_duration_column_index();
+            let finished_at_column_index = Order::get_duration_column_index();
 
             format!("{}:{} {}:{} {}:{} {}:{} {}:{}", 
             id_column_index, self.id, 
             table_id_column_index, self.table_id,
             created_at_column_index, self.created_at,
             item_column_index, self.item,
-            duration_column_index, self.duration)
+            finished_at_column_index, self.finished_at)
         }
 
         pub fn get_id_column_index() -> usize {
