@@ -18,7 +18,7 @@ pub mod client {
         }
 
         /// Send a POST request to the API for adding a new order.
-        pub async fn add_order(&self, table_id: u16, item: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        pub async fn add_order(&self, table_id: u32, item: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             //let uri = Uri::builder().authority(self.base_addr.to_string() + "/orders").build().unwrap();
             let client = Client::new();
             let req = Request::builder()
@@ -55,7 +55,7 @@ pub mod client {
         //     client.request(req).await?.body()
         // }
 
-        pub async fn get_items_for_table(&self, table_id: u16, item: &str) 
+        pub async fn get_items_for_table(&self, table_id: u32, item: &str) 
         -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
             let uri = Uri::builder()
                 .scheme(self.scheme.as_str())

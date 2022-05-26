@@ -2,11 +2,11 @@ pub mod data_models {
 
     #[derive(Debug)]
     pub struct Order {
-        pub id: u16,
-        pub table_id: u16,
+        pub id: u32,
+        pub table_id: u32,
         pub created_at: u128,
         pub item: String,
-        pub duration: u16,
+        pub duration: u32,
     }
 
     impl Order {
@@ -25,7 +25,7 @@ pub mod data_models {
             duration_column_index, self.duration)
         }
 
-        pub fn get_id_column_index() -> u8 {
+        pub fn get_id_column_index() -> usize {
             0
         }
 
@@ -33,15 +33,15 @@ pub mod data_models {
             1
         }
 
-        pub fn get_created_at_column_index() -> u8 {
+        pub fn get_created_at_column_index() -> usize {
             2
         }
 
-        pub fn get_item_column_index() -> u8 {
+        pub fn get_item_column_index() -> usize {
             3
         }
 
-        pub fn get_duration_column_index() -> u8 {
+        pub fn get_duration_column_index() -> usize {
             4
         }
     }
