@@ -17,6 +17,7 @@ pub mod storage {
         async fn delete_order(pool: Pool<PostgresConnectionManager<NoTls>>, id: i32) -> Result<Response<Body>, RunError<tokio_postgres::Error>>;
         async fn get_remaining_table_orders(pool: Pool<PostgresConnectionManager<NoTls>>, table_id: i32) -> Result<Response<Body>, RunError<tokio_postgres::Error>>;
         async fn get_items_for_table(pool: Pool<PostgresConnectionManager<NoTls>>, table_id: i32, items: &str) -> Result<Response<Body>, RunError<tokio_postgres::Error>>;
+        async fn get_orders(pool: Pool<PostgresConnectionManager<NoTls>>) -> Result<Response<Body>, RunError<tokio_postgres::Error>>;
     }
 
     /// Type of storage that makes use of a relational database.
@@ -97,6 +98,24 @@ pub mod storage {
 
             Ok(Response::new(Body::from(result_string)))
         }
+
+        async fn get_orders(pool: Pool<PostgresConnectionManager<NoTls>>)
+        -> Result<Response<Body>, RunError<tokio_postgres::Error>> {
+            let conn = pool.get().await?;
+            let response = conn.query("SELECT * from orders", &[]).await?;
+            let mut result: Vec<Order> = Vec::new();
+
+            for row in response {
+                result.push(row_to_order(&row));
+            }
+
+            let mut result_string: String = String::new();
+            for order in result {
+                result_string.push_str(format!("{}\n", order.to_string()).as_str());
+            }
+
+            Ok(Response::new(Body::from(result_string)))
+        }
     }
 
     fn row_to_order(row: &Row) -> Order {
@@ -153,6 +172,11 @@ pub mod storage {
                 *response.body_mut() = PostgresDatabase::delete_order(pool.clone(), params["id"].parse::<i32>().unwrap()).await?.into_body();
             },
 
+            (&Method::GET, "/orders") => {
+                println!("Getting all orders");
+                *response.body_mut() = PostgresDatabase::get_orders(pool.clone()).await?.into_body();
+            }
+
 
             _ => {
                 *response.status_mut() = StatusCode::NOT_FOUND;
@@ -166,7 +190,6 @@ pub mod storage {
     pub async fn init(pool: Pool<PostgresConnectionManager<NoTls>>) -> Result<Response<Body>, RunError<tokio_postgres::Error>> {
         let conn = pool.get().await?;
         let query = "BEGIN;
-        DROP TABLE IF EXISTS orders;
 
         CREATE TABLE IF NOT EXISTS orders (
           id SERIAL PRIMARY KEY,
@@ -175,9 +198,6 @@ pub mod storage {
           item VARCHAR(255) NOT NULL,
           finished_at TIMESTAMP NOT NULL
         );
-
-        INSERT INTO orders (table_id, created_at, item, finished_at) 
-            VALUES (999, '1999-01-08 04:05:06', 'Spaghetti', '1999-01-08 04:05:10');
         COMMIT;";
 
         println!("Running init for DB");

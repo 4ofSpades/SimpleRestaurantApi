@@ -10,7 +10,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     client.test_connection().await?;
 
     // Testing sequence
-    //println!("{}", client.add_order(1, "Katsudon").await?);
+    println!("{}", client.add_order(1, "Katsudon").await?);
     println!("{}", client.get_remaining_table_orders(1).await?);
     println!("{}", client.get_items_for_table(1, "Spaghetti").await?);
     println!("{}", client.delete_order(1).await?);

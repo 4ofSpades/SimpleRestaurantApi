@@ -1,5 +1,5 @@
 pub mod client {
-    use hyper::{Client, Request, Method, Body, Uri, body, http::uri::Authority};
+    use hyper::{Client, Request, Method, Body, Uri, body, http::uri::Authority, client};
     
 
     pub struct HttpClient {
@@ -82,6 +82,17 @@ pub mod client {
             let client = Client::new();
             let mut response = client.get(uri).await?;
             Ok(String::from_utf8(body::to_bytes(response.body_mut()).await?.to_vec()).unwrap())
+        }
+
+        pub async fn get_orders(&self)
+        -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+            let uri = Uri::builder()
+                .scheme(self.scheme.as_str())
+                .authority(self.authority.as_str())
+                .build().unwrap();
+                let client = Client::new();
+                let mut response = client.get(uri).await?;
+                Ok(String::from_utf8(body::to_bytes(response.body_mut()).await?.to_vec()).unwrap())
         }
 
         pub fn new(scheme: &str, authority: &str) -> HttpClient {
