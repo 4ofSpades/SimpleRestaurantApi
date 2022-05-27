@@ -5,6 +5,10 @@ use rand::{rngs::StdRng, SeedableRng, Rng};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    test_sequence().await
+}
+
+async fn test_sequence() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let scheme = "http";
     let authority = "127.0.0.1:7878";
     let client =HttpClient::new(scheme, authority);
