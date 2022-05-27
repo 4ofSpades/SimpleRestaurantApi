@@ -17,7 +17,7 @@ pub mod data_models {
             let table_id_column_index = Order::get_table_id_column_index();
             let created_at_column_index = Order::get_created_at_column_index();
             let item_column_index = Order::get_item_column_index();
-            let finished_at_column_index = Order::get_duration_column_index();
+            let finished_at_column_index = Order::get_finished_at_column_index();
 
             format!("{}:{} {}:{} {}:{} {}:{} {}:{}", 
             id_column_index, self.id, 
@@ -43,7 +43,7 @@ pub mod data_models {
             3
         }
 
-        pub fn get_duration_column_index() -> usize {
+        pub fn get_finished_at_column_index() -> usize {
             4
         }
     }

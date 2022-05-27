@@ -36,10 +36,12 @@ pub mod storage {
             let finished = finished.add(Duration::milliseconds(duration_millis));
             let item = item.to_ascii_lowercase();
             let item = item.trim();
-
+            println!("Adding order...");
             let conn = pool.get().await?;
-            let stmt = conn.prepare("INSERT INTO orders (table_id, created_at, item, duration) 
-            VALUES ($1, $2, $3)").await?;
+            let stmt = conn.prepare("INSERT INTO orders (table_id, created_at, item, finished_at) 
+            VALUES ($1, $2, $3, $4)").await?;
+            println!("Adding order...");
+            print!("{}", now.to_string());
             let response = conn.execute(&stmt, &[&table_id, &now, &item, &finished]).await?;
             Ok(Response::new(Body::from(format!("{} order of {} added for table {}", response, item, table_id))))
         }
@@ -83,7 +85,7 @@ pub mod storage {
                 FROM orders
                 WHERE table_id = $1
                 AND item LIKE $2").await?;
-            let item = format!("%{}%", item);
+            let item = format!("%{}%", item.to_ascii_lowercase());
             let response = conn.query(&stmt, &[&table_id, &item]).await?;
             let mut result: Vec<Order> = Vec::new();
 
@@ -123,7 +125,7 @@ pub mod storage {
         let table_id: i32 = row.get(Order::get_table_id_column_index());
         let created_at: DateTime<Utc> = row.get(Order::get_created_at_column_index());
         let item: String = row.get(Order::get_item_column_index());
-        let finished_at: DateTime<Utc> = row.get(Order::get_duration_column_index());
+        let finished_at: DateTime<Utc> = row.get(Order::get_finished_at_column_index());
         Order {
             id,
             table_id,
@@ -194,9 +196,9 @@ pub mod storage {
         CREATE TABLE IF NOT EXISTS orders (
           id SERIAL PRIMARY KEY,
           table_id INTEGER NOT NULL,
-          created_at TIMESTAMP NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL,
           item VARCHAR(255) NOT NULL,
-          finished_at TIMESTAMP NOT NULL
+          finished_at TIMESTAMPTZ NOT NULL
         );
         COMMIT;";
 

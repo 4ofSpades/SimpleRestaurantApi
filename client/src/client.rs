@@ -49,7 +49,7 @@ pub mod client {
             
             // Add parameters to body eventually
             let req = Request::builder()
-                .method(Method::POST)
+                .method(Method::DELETE)
                 .uri(uri)
                 .body(Body::empty()).unwrap();
 
@@ -89,6 +89,7 @@ pub mod client {
             let uri = Uri::builder()
                 .scheme(self.scheme.as_str())
                 .authority(self.authority.as_str())
+                .path_and_query("/orders")
                 .build().unwrap();
                 let client = Client::new();
                 let mut response = client.get(uri).await?;
