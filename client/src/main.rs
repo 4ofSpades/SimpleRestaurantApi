@@ -11,7 +11,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 async fn test_sequence() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let scheme = "http";
     let authority = "127.0.0.1:7878";
-    let client =HttpClient::new(scheme, authority);
+    let client = HttpClient::new(scheme, authority);
     client.test_connection().await?;
 
     // Testing sequence
