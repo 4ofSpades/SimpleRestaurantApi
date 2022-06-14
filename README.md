@@ -38,3 +38,7 @@ Next up is the client. Essentially the only thing the client provides is a set o
 The docs folder contains a version of database that is more suitable for production. If compared with the simplified version, it can be seen that some values are slightly outdated (e.g. created_at uses TIMESTAMP now), but the design should for the most part remain the same. Due to time constraints, I have not created a specific test class, but used the client project main function as a simple test instead.
 
 I recommend looking over the previous commits too. There were several problems with certain packages, hence why the design changd significantly over time. That is also the reason why I used certain primitive types that are probably larger than necessary is mainly because of constraints by tokio_postgres.
+
+## Update notes
+*Update 2022/06/15*
+I added a skeleton for tests as every production ready part should include it. I'll do my best to implement meaningful tests as soon as possible. For the time being, I'll include test changes to a separate branch.
